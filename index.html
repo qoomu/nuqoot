@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Global Fund Connect - Instant IDR Payouts</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f7f7; /* Light background */
+        }
+        .container-card {
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 0 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        /* Custom scrollbar for request history */
+        #requestHistory::-webkit-scrollbar {
+            width: 6px;
+        }
+        #requestHistory::-webkit-scrollbar-thumb {
+            background-color: #3b82f6;
+            border-radius: 3px;
+        }
+        #requestHistory::-webkit-scrollbar-track {
+            background-color: #e5e7eb;
+        }
+    </style>
+</head>
+<body class="min-h-screen p-4 md:p-8 flex items-start justify-center">
+
+    <div class="w-full max-w-4xl space-y-8">
+        <!-- Header -->
+        <header class="text-center py-6 bg-white container-card rounded-xl">
+            <h1 class="text-4xl font-extrabold text-blue-800">Global Fund Connect</h1>
+            <p class="text-xl mt-2 text-gray-600">Effortless Digital Asset Liquidity for IDR Payouts</p>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <!-- Asset Conversion Form -->
+            <div id="conversionFormCard" class="bg-white p-6 md:p-8 rounded-xl container-card h-fit">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-3">Request Local Payout</h2>
+                
+                <div id="authStatus" class="mb-4 p-3 rounded-lg text-sm text-center bg-yellow-100 text-yellow-800 hidden">
+                    Initializing connection...
+                </div>
+
+                <form id="conversionForm" class="space-y-4">
+                    <!-- Amount Input (The Digital Asset) -->
+                    <div>
+                        <label for="amountUSD" class="block text-sm font-medium text-gray-700">Digital Value to Convert (USD Equivalent)</label>
+                        <div class="mt-1 relative rounded-md shadow-sm">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <span class="text-gray-500 sm:text-sm">$</span>
+                            </div>
+                            <input type="number" name="amountUSD" id="amountUSD" required min="100" placeholder="Minimum $100"
+                                class="focus:ring-blue-500 focus:border-blue-500 block w-full pl-8 pr-12 sm:text-sm border-gray-300 rounded-md p-2">
+                        </div>
+                    </div>
+
+                    <!-- Payout Method Select (Local Receiver) -->
+                    <div>
+                        <label for="receiverType" class="block text-sm font-medium text-gray-700">Preferred Local Payout Method (IDR)</label>
+                        <select id="receiverType" name="receiverType" required
+                            class="mt-1 block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm">
+                            <option value="">-- Select Method --</option>
+                            <option value="Bank BCA">Bank Transfer (BCA)</option>
+                            <option value="Bank Mandiri">Bank Transfer (Mandiri)</option>
+                            <option value="Bank BNI">Bank Transfer (BNI)</option>
+                            <option value="Gopay">E-Wallet (GoPay)</option>
+                            <option value="OVO">E-Wallet (OVO)</option>
+                            <option value="Dana">E-Wallet (DANA)</option>
+                            <option value="Other">Other Indonesian Bank/E-Wallet</option>
+                        </select>
+                    </div>
+
+                    <!-- Contact Information -->
+                    <div>
+                        <label for="contact" class="block text-sm font-medium text-gray-700">Contact for Transaction (Telegram/WhatsApp ID)</label>
+                        <input type="text" name="contact" id="contact" required placeholder="@YourTelegram or +62 8xx"
+                            class="mt-1 focus:ring-blue-500 focus:border-blue-500 block w-full shadow-sm sm:text-sm border-gray-300 rounded-md p-2">
+                    </div>
+                    
+                    <button type="submit" id="submitButton"
+                        class="w-full flex justify-center py-3 px-4 border border-transparent rounded-md shadow-lg text-lg font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out disabled:opacity-50">
+                        Submit Conversion Request
+                    </button>
+                    <p class="text-xs text-gray-500 text-center mt-3">By submitting, you agree to our confidential P2P processing terms.</p>
+                </form>
+            </div>
+
+            <!-- Request History / Status -->
+            <div class="bg-white p-6 md:p-8 rounded-xl container-card h-fit">
+                <h2 class="text-2xl font-bold text-gray-800 mb-6 border-b pb-3">My Request History</h2>
+                
+                <div id="userInfo" class="text-sm p-3 mb-4 bg-indigo-50 text-indigo-800 rounded-lg">
+                    User ID: <span id="displayUserId" class="font-mono text-xs break-all">...</span>
+                </div>
+
+                <div id="requestHistory" class="space-y-4 max-h-96 overflow-y-auto pr-2">
+                    <p id="loadingHistory" class="text-gray-500 text-center">Loading request history...</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Redirection Modal -->
+    <div id="redirectModal" class="fixed inset-0 bg-gray-900 bg-opacity-75 hidden items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-xl max-w-xl w-full p-8 shadow-2xl">
+            <h3 class="text-3xl font-bold text-green-600 mb-4 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Request Submitted!
+            </h3>
+            <p class="text-gray-700 mb-6">Your conversion request has been securely logged. The next step is the confidential P2P processing.</p>
+            <div class="bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                <p class="font-semibold text-yellow-800 mb-2">Next Steps (Mandatory):</p>
+                <ol class="list-decimal list-inside space-y-1 text-sm text-yellow-700">
+                    <li>We will contact you via your provided ID (Telegram/WhatsApp) within minutes.</li>
+                    <li>You will be redirected to the secure P2P app to finalize the asset transfer and confirm the local payout details.</li>
+                </ol>
+            </div>
+            <button id="closeModalButton"
+                class="mt-6 w-full py-3 px-4 rounded-md shadow-md text-lg font-medium text-white bg-green-500 hover:bg-green-600 transition duration-150 ease-in-out">
+                Proceed to Secure Channel (Simulated)
+            </button>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        // Global Variables are provided by the canvas environment
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            signInWithCustomToken, 
+            onAuthStateChanged 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            addDoc, 
+            query, 
+            where, 
+            onSnapshot, 
+            serverTimestamp,
+            getDocs,
+            doc
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // DOM Elements
+        const form = document.getElementById('conversionForm');
+        const historyContainer = document.getElementById('requestHistory');
+        const submitButton = document.getElementById('submitButton');
+        const modal = document.getElementById('redirectModal');
+        const closeModalButton = document.getElementById('closeModalButton');
+        const authStatus = document.getElementById('authStatus');
+        const displayUserId = document.getElementById('displayUserId');
+        const loadingHistory = document.getElementById('loadingHistory');
+
+        let app, db, auth, userId = null;
+
+        /**
+         * Initializes Firebase and handles authentication.
+         */
+        async function initializeFirebase() {
+            if (!firebaseConfig) {
+                authStatus.textContent = 'Firebase configuration missing. Cannot connect.';
+                authStatus.classList.remove('hidden');
+                submitButton.disabled = true;
+                loadingHistory.textContent = 'Cannot load history.';
+                return;
+            }
+            
+            authStatus.textContent = 'Connecting to service...';
+            authStatus.classList.remove('hidden', 'bg-red-100', 'text-red-800');
+            authStatus.classList.add('bg-yellow-100', 'text-yellow-800');
+
+            try {
+                app = initializeApp(firebaseConfig);
+                db = getFirestore(app);
+                auth = getAuth(app);
+
+                // Sign in with provided token or anonymously
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+
+                // Wait for auth state change to confirm user ID
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        userId = user.uid;
+                        displayUserId.textContent = userId;
+                        authStatus.textContent = 'Connection established. Ready to submit requests.';
+                        authStatus.classList.remove('bg-yellow-100', 'text-yellow-800');
+                        authStatus.classList.add('bg-green-100', 'text-green-800');
+                        submitButton.disabled = false;
+                        
+                        // Start listening for requests immediately after auth is ready
+                        listenForRequests(userId);
+                    } else {
+                        // This should ideally not happen if auth succeeded, but handle fallback
+                        userId = crypto.randomUUID(); 
+                        displayUserId.textContent = userId + ' (Unauthenticated)';
+                        authStatus.textContent = 'Signed in anonymously. Data is private to this browser.';
+                        authStatus.classList.remove('bg-yellow-100', 'text-yellow-800');
+                        authStatus.classList.add('bg-indigo-100', 'text-indigo-800');
+                        submitButton.disabled = false;
+                         listenForRequests(userId); // Use fallback ID
+                    }
+                    setTimeout(() => authStatus.classList.add('hidden'), 5000); // Hide after 5 seconds
+                });
+
+            } catch (error) {
+                console.error("Firebase Initialization or Auth Error:", error);
+                authStatus.textContent = `Error connecting: ${error.message}.`;
+                authStatus.classList.remove('bg-yellow-100', 'text-yellow-800');
+                authStatus.classList.add('bg-red-100', 'text-red-800');
+                submitButton.disabled = true;
+                loadingHistory.textContent = 'Failed to load history due to connection error.';
+            }
+        }
+        
+        /**
+         * Converts a Date object or Firestore Timestamp to a readable string.
+         * @param {object} timestamp - Firestore timestamp object (or null)
+         * @returns {string} Formatted date string
+         */
+        function formatTimestamp(timestamp) {
+            if (timestamp && timestamp.toDate) {
+                return timestamp.toDate().toLocaleString('en-GB', { 
+                    day: '2-digit', 
+                    month: 'short', 
+                    year: 'numeric', 
+                    hour: '2-digit', 
+                    minute: '2-digit' 
+                });
+            }
+            return 'N/A';
+        }
+
+        /**
+         * Renders the list of conversion requests.
+         * @param {Array<Object>} requests - Array of request documents.
+         */
+        function renderRequests(requests) {
+            historyContainer.innerHTML = ''; // Clear existing content
+            loadingHistory.classList.add('hidden');
+
+            if (requests.length === 0) {
+                historyContainer.innerHTML = '<p class="text-gray-500 text-center p-4 border rounded-lg">No previous requests found. Submit your first one!</p>';
+                return;
+            }
+
+            requests.forEach(request => {
+                let statusClasses = '';
+                switch (request.status) {
+                    case 'Pending':
+                        statusClasses = 'bg-yellow-100 text-yellow-800';
+                        break;
+                    case 'Processing':
+                        statusClasses = 'bg-blue-100 text-blue-800';
+                        break;
+                    case 'Completed':
+                        statusClasses = 'bg-green-100 text-green-800';
+                        break;
+                    default:
+                        statusClasses = 'bg-gray-100 text-gray-800';
+                }
+
+                const requestElement = document.createElement('div');
+                requestElement.className = 'p-4 rounded-xl border border-gray-200 bg-gray-50 hover:shadow-md transition duration-150';
+                requestElement.innerHTML = `
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="text-xl font-semibold text-gray-800">$${request.amountUSD.toLocaleString()}</span>
+                        <span class="px-3 py-1 text-xs font-medium rounded-full ${statusClasses}">${request.status}</span>
+                    </div>
+                    <p class="text-sm text-gray-600">Payout: <span class="font-medium">${request.receiverType}</span></p>
+                    <p class="text-xs text-gray-500 mt-1">Contact: ${request.contact}</p>
+                    <p class="text-xs text-gray-400 mt-1">Requested: ${formatTimestamp(request.timestamp)}</p>
+                `;
+                historyContainer.appendChild(requestElement);
+            });
+        }
+
+        /**
+         * Sets up real-time listener for user's requests.
+         * @param {string} currentUserId - The authenticated user's ID.
+         */
+        function listenForRequests(currentUserId) {
+            if (!db || !currentUserId) return;
+
+            // Private collection path for user-specific requests
+            const collectionPath = `artifacts/${appId}/users/${currentUserId}/usdt_requests`;
+            const requestsCollection = collection(db, collectionPath);
+            
+            // Query: Get all requests for the current user ID
+            // NOTE: Sorting is done in-memory after fetching due to Firestore indexing requirements
+            const q = query(requestsCollection);
+
+            onSnapshot(q, (snapshot) => {
+                const requests = [];
+                snapshot.forEach((doc) => {
+                    requests.push({ id: doc.id, ...doc.data() });
+                });
+                
+                // Sort by timestamp descending (latest first)
+                requests.sort((a, b) => {
+                    const timeA = a.timestamp?.toMillis() || 0;
+                    const timeB = b.timestamp?.toMillis() || 0;
+                    return timeB - timeA;
+                });
+                
+                renderRequests(requests);
+            }, (error) => {
+                console.error("Error listening to requests:", error);
+                loadingHistory.textContent = 'Error loading history. Check console.';
+                loadingHistory.classList.remove('hidden');
+            });
+        }
+
+        /**
+         * Handles the form submission to save the request to Firestore.
+         * @param {Event} e - The form submission event.
+         */
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            if (!db || !userId) {
+                alert('Service not ready. Please wait for initialization.');
+                return;
+            }
+
+            const data = new FormData(e.target);
+            const amountUSD = parseFloat(data.get('amountUSD'));
+            const receiverType = data.get('receiverType');
+            const contact = data.get('contact');
+
+            if (amountUSD < 100) {
+                alert('Minimum digital value to convert is $100.');
+                return;
+            }
+
+            submitButton.disabled = true;
+            submitButton.textContent = 'Submitting...';
+
+            try {
+                const requestData = {
+                    amountUSD: amountUSD,
+                    receiverType: receiverType,
+                    contact: contact,
+                    status: 'Pending',
+                    timestamp: serverTimestamp(),
+                    // Storing userId inside the document is optional but good practice for reference
+                    requestorId: userId 
+                };
+
+                // Define the collection path for private user data
+                const collectionPath = `artifacts/${appId}/users/${userId}/usdt_requests`;
+                const requestsCollection = collection(db, collectionPath);
+
+                await addDoc(requestsCollection, requestData);
+
+                // Show success modal and reset form
+                modal.classList.remove('hidden');
+                modal.classList.add('flex');
+                form.reset();
+
+            } catch (error) {
+                console.error("Error adding document: ", error);
+                alert(`Submission failed: ${error.message}`);
+            } finally {
+                submitButton.disabled = false;
+                submitButton.textContent = 'Submit Conversion Request';
+            }
+        });
+
+        // Close modal and simulate redirection
+        closeModalButton.addEventListener('click', () => {
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+            // Simulate redirection to the P2P App (replace with actual logic if needed)
+            console.log("Simulating redirection to P2P processing application...");
+            // In a real app, you would redirect the user here.
+        });
+
+        // Initialize everything when the window loads
+        window.onload = initializeFirebase;
+    </script>
+</body>
+</html>
