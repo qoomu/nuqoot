@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Global Fund Connect - Instant IDR Payouts</title>
     
+    <!-- PWA MANIFEST LINK (NEW) -->
+    <link rel="manifest" href="manifest.json">
+
     <!-- Apple Mobile Web App Meta Tags (Kept) -->
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -168,6 +171,22 @@
 
         let userId = null;
         let localStorageKey = null;
+
+        /**
+         * PWA Service Worker Registration
+         */
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('service-worker.js')
+                    .then(registration => {
+                        console.log('ServiceWorker registration successful with scope: ', registration.scope);
+                    })
+                    .catch(error => {
+                        console.log('ServiceWorker registration failed: ', error);
+                    });
+            });
+        }
+
 
         /**
          * Initializes the application, setting up a unique user ID for local storage.
